@@ -77,8 +77,8 @@ static bool redsched_use_subflow(struct sock *meta_sk,
 
 	if (TCP_SKB_CB(skb)->path_mask == 0) {
 		if (active_valid_sks == -1)
-			active_valid_sks = redsched_get_active_valid_sks(meta_sk);
-
+			active_valid_sks =
+				redsched_get_active_valid_sks(meta_sk);
 		if (subflow_is_backup(tp) && active_valid_sks > 0)
 			return false;
 		else
@@ -137,7 +137,8 @@ static void redsched_correct_skb_pointers(struct sock *meta_sk,
 {
 	struct tcp_sock *meta_tp = tcp_sk(meta_sk);
 
-	if (sk_data->skb && !after(sk_data->skb_end_seq, meta_tp->snd_una))
+	if (sk_data->skb && !after(sk_data->skb_end_seq,
+				   meta_tp->snd_una))
 		sk_data->skb = NULL;
 }
 
@@ -167,8 +168,13 @@ static struct sk_buff *redundant_next_segment(struct sock *meta_sk,
 	struct redsched_cb_data *cb_data = redsched_get_cb_data(meta_tp);
 	struct tcp_sock *first_tp = cb_data->next_subflow;
 	struct tcp_sock *tp;
+	struct redsched_sock_data *sk_data;
 	struct sk_buff *skb;
 	int active_valid_sks = -1;
+
+	if (!first_tp)
+		first_tp = mpcb->connection_list;
+	tp = first_tp;
 
 	if (skb_queue_empty(&mpcb->reinject_queue) &&
 	    skb_queue_empty(&meta_sk->sk_write_queue))
@@ -186,16 +192,9 @@ static struct sk_buff *redundant_next_segment(struct sock *meta_sk,
 	}
 
 	/* Then try indistinctly redundant and normal skbs */
-
-	if (!first_tp)
-		first_tp = mpcb->connection_list;
-	tp = first_tp;
-
 	*reinject = 0;
 	active_valid_sks = redsched_get_active_valid_sks(meta_sk);
 	do {
-		struct redsched_sock_data *sk_data;
-
 		/* Correct the skb pointers of the current subflow */
 		sk_data = redsched_get_sock_data(tp);
 		redsched_correct_skb_pointers(meta_sk, sk_data);
@@ -205,7 +204,8 @@ static struct sk_buff *redundant_next_segment(struct sock *meta_sk,
 		if (skb && redsched_use_subflow(meta_sk, active_valid_sks, tp,
 						skb)) {
 			sk_data->skb = skb;
-			sk_data->skb_end_seq = TCP_SKB_CB(skb)->end_seq;
+			sk_data->skb_end_seq =
+					TCP_SKB_CB(skb)->end_seq;
 			cb_data->next_subflow = tp->mptcp->next;
 			*subsk = (struct sock *)tp;
 			return skb;
